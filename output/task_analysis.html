@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日報タスク分析ダッシュボード</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --primary-dark: #5568d3;
+            --secondary: #f093fb;
+            --accent: #4facfe;
+            --success: #43e97b;
+            --danger: #ff6b6b;
+            --dark: #1a1a2e;
+            --light: #f8f9fa;
+            --white: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.25);
+            --glass-border: rgba(255, 255, 255, 0.18);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            padding: 20px;
+            color: var(--dark);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(240, 147, 251, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(79, 172, 254, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.5);
+            margin-bottom: 30px;
+            text-align: center;
+            animation: slideDown 0.6s ease-out;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        header:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 25px 70px rgba(0, 0, 0, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h1 {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 3em;
+            font-weight: 800;
+            margin-bottom: 15px;
+            letter-spacing: -0.02em;
+        }
+
+        .file-upload {
+            margin-top: 30px;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(240, 147, 251, 0.1) 100%);
+            border-radius: 16px;
+            border: 2px dashed var(--primary);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .file-upload:hover {
+            border-color: var(--secondary);
+            transform: scale(1.02);
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1.05em;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .file-upload-label::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .file-upload-label:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .file-upload-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(102, 126, 234, 0.5);
+        }
+
+        .file-upload-label:active {
+            transform: translateY(0);
+        }
+
+        .file-list {
+            margin-top: 20px;
+            font-size: 0.95em;
+            color: var(--dark);
+            font-weight: 500;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 8px;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 32px;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.5);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeInUp 0.6s ease-out backwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chart-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.5s ease;
+        }
+
+        .chart-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 
+                0 30px 80px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
+        .chart-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .chart-card h2 {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+            font-size: 1.6em;
+            font-weight: 700;
+            padding-bottom: 12px;
+            border-bottom: 3px solid;
+            border-image: linear-gradient(90deg, var(--primary), var(--secondary)) 1;
+            position: relative;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 320px;
+            margin-bottom: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 28px;
+            border-radius: 20px;
+            box-shadow: 
+                0 15px 40px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.5);
+            text-align: center;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            animation: fadeInUp 0.6s ease-out backwards;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card:nth-child(1) { animation-delay: 0.1s; }
+        .stat-card:nth-child(2) { animation-delay: 0.2s; }
+        .stat-card:nth-child(3) { animation-delay: 0.3s; }
+        .stat-card:nth-child(4) { animation-delay: 0.4s; }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(240, 147, 251, 0.1));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-8px) scale(1.05);
+            box-shadow: 
+                0 25px 60px rgba(0, 0, 0, 0.15),
+                0 0 0 1px rgba(255, 255, 255, 0.6);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-value {
+            font-size: 3em;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.95em;
+            font-weight: 500;
+            position: relative;
+            z-index: 1;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            margin: 30px 0;
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .error {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+            padding: 20px 24px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(255, 107, 107, 0.4);
+            font-weight: 500;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .task-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+            padding-right: 8px;
+        }
+
+        .task-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .task-list::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        .task-list::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 10px;
+        }
+
+        .task-item {
+            padding: 14px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(240, 147, 251, 0.08));
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .task-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .task-item strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .chart-container {
+                height: 280px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            header {
+                padding: 25px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.6em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 日報タスク分析ダッシュボード</h1>
+            <p style="color: #666; margin-top: 10px; font-size: 1.1em; font-weight: 500;">あなたのタスクを可視化して、より効率的な働き方を発見しましょう</p>
+            <div class="file-upload">
+                <label for="fileInput" class="file-upload-label">
+                    <span style="position: relative; z-index: 1;">📁 日報ファイルを選択（複数選択可）</span>
+                </label>
+                <input type="file" id="fileInput" multiple accept=".md">
+                <div class="file-list" id="fileList"></div>
+            </div>
+        </header>
+
+        <div id="loading" class="loading" style="display: none;">
+            データを解析中...
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="dashboard" style="display: none;">
+            <div class="stats-grid" id="statsGrid"></div>
+            <div class="dashboard" id="chartsContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        // データストレージ
+        let dailyReports = [];
+        let charts = {};
+
+        // ファイル選択イベント
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            document.getElementById('fileList').innerHTML = `選択されたファイル: ${files.length}件`;
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                dailyReports = [];
+                for (const file of files) {
+                    const text = await file.text();
+                    const report = parseReport(text, file.name);
+                    if (report) {
+                        dailyReports.push(report);
+                    }
+                }
+
+                if (dailyReports.length > 0) {
+                    analyzeData();
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('dashboard').style.display = 'block';
+                } else {
+                    throw new Error('有効な日報データが見つかりませんでした');
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = `エラー: ${error.message}`;
+            }
+        });
+
+        // 日報パーサー
+        function parseReport(text, filename) {
+            try {
+                const report = {
+                    filename: filename,
+                    date: null,
+                    tasks: [],
+                    achievements: [],
+                    issues: [],
+                    tomorrowPlans: []
+                };
+
+                const lines = text.split('\n');
+                let currentSection = null;
+
+                // 日付抽出
+                const dateMatch = text.match(/\*\*日付\*\*[：:]\s*(\d{4}年\d{1,2}月\d{1,2}日)/);
+                if (dateMatch) {
+                    report.date = dateMatch[1];
+                }
+
+                // 表形式の業務内容を抽出
+                const tableStart = text.indexOf('| 時間帯');
+                if (tableStart !== -1) {
+                    const tableEnd = text.indexOf('\n\n', tableStart);
+                    const tableText = text.substring(tableStart, tableEnd !== -1 ? tableEnd : text.length);
+                    const tableLines = tableText.split('\n').filter(line => line.trim().startsWith('|') && !line.includes('---'));
+
+                    tableLines.forEach(line => {
+                        const cells = line.split('|').map(c => c.trim()).filter(c => c);
+                        if (cells.length >= 2) {
+                            const timeRange = cells[0];
+                            const taskContent = cells[1];
+                            const note = cells[2] || '';
+
+                            // 時間を計算
+                            const timeMatch = timeRange.match(/(\d{2}):(\d{2})-(\d{2}):(\d{2})/);
+                            if (timeMatch) {
+                                const startHour = parseInt(timeMatch[1]);
+                                const startMin = parseInt(timeMatch[2]);
+                                const endHour = parseInt(timeMatch[3]);
+                                const endMin = parseInt(timeMatch[4]);
+                                const hours = (endHour * 60 + endMin - startHour * 60 - startMin) / 60;
+
+                                report.tasks.push({
+                                    timeRange: timeRange,
+                                    content: taskContent,
+                                    note: note,
+                                    hours: hours,
+                                    category: categorizeTask(taskContent)
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // 成果を抽出
+                const achievementsMatch = text.match(/## 本日の成果\s*\n([\s\S]*?)(?=##|$)/);
+                if (achievementsMatch) {
+                    const achievementsText = achievementsMatch[1];
+                    const achievementLines = achievementsText.split('\n').filter(line => line.trim().startsWith('-'));
+                    report.achievements = achievementLines.map(line => line.replace(/^-\s*/, '').trim());
+                }
+
+                // 課題・反省点を抽出
+                const issuesMatch = text.match(/## 課題・反省点\s*\n([\s\S]*?)(?=##|$)/);
+                if (issuesMatch) {
+                    const issuesText = issuesMatch[1];
+                    const issueLines = issuesText.split('\n').filter(line => line.trim().startsWith('-'));
+                    report.issues = issueLines.map(line => line.replace(/^-\s*/, '').trim());
+                }
+
+                // 明日の予定を抽出
+                const tomorrowMatch = text.match(/## 明日の予定\s*\n([\s\S]*?)(?=##|$)/);
+                if (tomorrowMatch) {
+                    const tomorrowText = tomorrowMatch[1];
+                    const tomorrowLines = tomorrowText.split('\n').filter(line => line.trim().startsWith('-'));
+                    report.tomorrowPlans = tomorrowLines.map(line => line.replace(/^-\s*/, '').trim());
+                }
+
+                return report.date ? report : null;
+            } catch (error) {
+                console.error('パースエラー:', error);
+                return null;
+            }
+        }
+
+        // タスクカテゴリ分類
+        function categorizeTask(content) {
+            const lowerContent = content.toLowerCase();
+            
+            if (lowerContent.includes('企画') || lowerContent.includes('提案') || 
+                lowerContent.includes('資料作成') || lowerContent.includes('セミナー') ||
+                lowerContent.includes('広告') || lowerContent.includes('クリエイティブ') ||
+                lowerContent.includes('講座') || lowerContent.includes('勉強会')) {
+                return '企画';
+            } else if (lowerContent.includes('商談') || lowerContent.includes('顧客') || 
+                       lowerContent.includes('アプローチ') || lowerContent.includes('クライアント') ||
+                       lowerContent.includes('営業') || lowerContent.includes('新規')) {
+                return '営業';
+            } else if (lowerContent.includes('バグ') || lowerContent.includes('修正') || 
+                       lowerContent.includes('デプロイ') || lowerContent.includes('開発') ||
+                       lowerContent.includes('対応') || lowerContent.includes('修正')) {
+                return '開発';
+            } else {
+                return 'その他';
+            }
+        }
+
+        // データ分析
+        function analyzeData() {
+            // 既存のチャートを破棄
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            // 統計情報を計算
+            const totalDays = dailyReports.length;
+            const totalTasks = dailyReports.reduce((sum, r) => sum + r.tasks.length, 0);
+            const totalHours = dailyReports.reduce((sum, r) => 
+                sum + r.tasks.reduce((s, t) => s + t.hours, 0), 0);
+            const avgHoursPerDay = totalHours / totalDays;
+
+            // 統計カードを表示
+            displayStats(totalDays, totalTasks, totalHours, avgHoursPerDay);
+
+            // 各種グラフを描画
+            drawCategoryChart();
+            drawTimeDistributionChart();
+            drawDailyTrendChart();
+            drawFrequentTasksChart();
+        }
+
+        // 統計カード表示
+        function displayStats(days, tasks, hours, avgHours) {
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${days}</div>
+                    <div class="stat-label">📅 分析日数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${tasks}</div>
+                    <div class="stat-label">✅ 総タスク数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${hours.toFixed(1)}</div>
+                    <div class="stat-label">⏱️ 総作業時間（時間）</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgHours.toFixed(1)}</div>
+                    <div class="stat-label">📊 1日平均作業時間</div>
+                </div>
+            `;
+        }
+
+        // カテゴリ別円グラフ
+        function drawCategoryChart() {
+            const categoryHours = {};
+            dailyReports.forEach(report => {
+                report.tasks.forEach(task => {
+                    categoryHours[task.category] = (categoryHours[task.category] || 0) + task.hours;
+                });
+            });
+
+            const ctx = createChartCanvas('categoryChart', '📊 タスクカテゴリ別時間配分');
+            charts.categoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categoryHours),
+                    datasets: [{
+                        data: Object.values(categoryHours),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(240, 147, 251, 0.8)',
+                            'rgba(79, 172, 254, 0.8)',
+                            'rgba(67, 233, 123, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(240, 147, 251, 1)',
+                            'rgba(79, 172, 254, 1)',
+                            'rgba(67, 233, 123, 1)'
+                        ],
+                        borderWidth: 3,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true,
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            titleFont: {
+                                size: 14,
+                                weight: '600'
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1,
+                            cornerRadius: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value.toFixed(1)}時間 (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 時間帯別分布グラフ
+        function drawTimeDistributionChart() {
+            const timeSlots = {
+                '09:00-12:00': 0,
+                '12:00-13:00': 0,
+                '13:00-15:00': 0,
+                '15:00-17:00': 0,
+                '17:00-18:00': 0,
+                'その他': 0
+            };
+
+            dailyReports.forEach(report => {
+                report.tasks.forEach(task => {
+                    const timeRange = task.timeRange;
+                    let found = false;
+                    for (const slot in timeSlots) {
+                        if (timeRange.includes(slot.split('-')[0])) {
+                            timeSlots[slot] += task.hours;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        timeSlots['その他'] += task.hours;
+                    }
+                });
+            });
+
+            const ctx = createChartCanvas('timeChart', '⏰ 時間帯別作業時間分布');
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(102, 126, 234, 0.8)');
+            gradient.addColorStop(1, 'rgba(240, 147, 251, 0.8)');
+
+            charts.timeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(timeSlots),
+                    datasets: [{
+                        label: '作業時間（時間）',
+                        data: Object.values(timeSlots),
+                        backgroundColor: gradient,
+                        borderRadius: 12,
+                        borderSkipped: false,
+                        barThickness: 50
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return `作業時間: ${context.parsed.y.toFixed(1)}時間`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '時間',
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                },
+                                color: '#666'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                color: '#666'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 日次推移グラフ
+        function drawDailyTrendChart() {
+            const sortedReports = [...dailyReports].sort((a, b) => {
+                const dateA = parseDate(a.date);
+                const dateB = parseDate(b.date);
+                return dateA - dateB;
+            });
+
+            const dates = sortedReports.map(r => {
+                const date = parseDate(r.date);
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+            });
+            const taskCounts = sortedReports.map(r => r.tasks.length);
+            const hours = sortedReports.map(r => 
+                r.tasks.reduce((sum, t) => sum + t.hours, 0));
+
+            const ctx = createChartCanvas('trendChart', '📈 日次タスク推移');
+            
+            const gradient1 = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient1.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
+            gradient1.addColorStop(1, 'rgba(102, 126, 234, 0)');
+
+            const gradient2 = ctx.getContext('2d').createLinearGradient(0, 0, 0, 400);
+            gradient2.addColorStop(0, 'rgba(240, 147, 251, 0.3)');
+            gradient2.addColorStop(1, 'rgba(240, 147, 251, 0)');
+
+            charts.trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'タスク数',
+                        data: taskCounts,
+                        borderColor: '#667eea',
+                        backgroundColor: gradient1,
+                        yAxisID: 'y',
+                        tension: 0.5,
+                        fill: true,
+                        borderWidth: 3,
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }, {
+                        label: '作業時間（時間）',
+                        data: hours,
+                        borderColor: '#f093fb',
+                        backgroundColor: gradient2,
+                        yAxisID: 'y1',
+                        tension: 0.5,
+                        fill: true,
+                        borderWidth: 3,
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#f093fb',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 12,
+                            borderColor: 'rgba(255, 255, 255, 0.1)',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'タスク数',
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                },
+                                color: '#666'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '作業時間（時間）',
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                color: '#666'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                },
+                                color: '#666'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                color: '#666'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // よく行うタスクグラフ
+        function drawFrequentTasksChart() {
+            const taskFrequency = {};
+            dailyReports.forEach(report => {
+                report.tasks.forEach(task => {
+                    // タスク内容を簡略化
+                    let simplified = task.content;
+                    // 長いタスク名を短縮
+                    if (simplified.length > 20) {
+                        simplified = simplified.substring(0, 20) + '...';
+                    }
+                    taskFrequency[simplified] = (taskFrequency[simplified] || 0) + 1;
+                });
+            });
+
+            // 上位10件を取得
+            const sortedTasks = Object.entries(taskFrequency)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctx = createChartCanvas('frequentChart', '🔥 よく行うタスク TOP10');
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 400, 0);
+            gradient.addColorStop(0, 'rgba(79, 172, 254, 0.8)');
+            gradient.addColorStop(1, 'rgba(102, 126, 234, 0.8)');
+
+            charts.frequentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedTasks.map(t => t[0]),
+                    datasets: [{
+                        label: '実施回数',
+                        data: sortedTasks.map(t => t[1]),
+                        backgroundColor: gradient,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                        barThickness: 35
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    return `実施回数: ${context.parsed.x}回`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '実施回数',
+                                font: {
+                                    size: 13,
+                                    weight: '600'
+                                },
+                                color: '#666'
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                },
+                                color: '#666',
+                                stepSize: 1
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                font: {
+                                    size: 11,
+                                    weight: '500'
+                                },
+                                color: '#666'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // チャートキャンバス作成ヘルパー
+        function createChartCanvas(id, title) {
+            const container = document.getElementById('chartsContainer');
+            const card = document.createElement('div');
+            card.className = 'chart-card';
+            card.innerHTML = `
+                <h2>${title}</h2>
+                <div class="chart-container">
+                    <canvas id="${id}"></canvas>
+                </div>
+            `;
+            container.appendChild(card);
+            return document.getElementById(id);
+        }
+
+        // 日付パースヘルパー
+        function parseDate(dateStr) {
+            const match = dateStr.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+            if (match) {
+                return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+            }
+            return new Date();
+        }
+    </script>
+</body>
+</html>
+
